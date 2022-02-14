@@ -8,17 +8,22 @@
 
 /* Begin PBXBuildFile section */
 		3868991627AB76A3004126AC /* GazeCollectApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3868991527AB76A3004126AC /* GazeCollectApp.swift */; };
-		3868991827AB76A3004126AC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3868991727AB76A3004126AC /* ContentView.swift */; };
+		3868991827AB76A3004126AC /* MenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3868991727AB76A3004126AC /* MenuView.swift */; };
 		3868991A27AB76A5004126AC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3868991927AB76A5004126AC /* Assets.xcassets */; };
 		3868991D27AB76A5004126AC /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3868991C27AB76A5004126AC /* Preview Assets.xcassets */; };
+		3868992427AB7A52004126AC /* GameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3868992327AB7A52004126AC /* GameView.swift */; };
+		3868992827B496F2004126AC /* GameScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3868992727B496F2004126AC /* GameScene.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		3868991227AB76A3004126AC /* GazeCollect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GazeCollect.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3868991527AB76A3004126AC /* GazeCollectApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GazeCollectApp.swift; sourceTree = "<group>"; };
-		3868991727AB76A3004126AC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		3868991727AB76A3004126AC /* MenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuView.swift; sourceTree = "<group>"; };
 		3868991927AB76A5004126AC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3868991C27AB76A5004126AC /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		3868992327AB7A52004126AC /* GameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameView.swift; sourceTree = "<group>"; };
+		3868992727B496F2004126AC /* GameScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScene.swift; sourceTree = "<group>"; };
+		3868992D27B53D57004126AC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,10 +56,13 @@
 		3868991427AB76A3004126AC /* GazeCollect */ = {
 			isa = PBXGroup;
 			children = (
+				3868992D27B53D57004126AC /* Info.plist */,
 				3868991527AB76A3004126AC /* GazeCollectApp.swift */,
-				3868991727AB76A3004126AC /* ContentView.swift */,
+				3868991727AB76A3004126AC /* MenuView.swift */,
 				3868991927AB76A5004126AC /* Assets.xcassets */,
 				3868991B27AB76A5004126AC /* Preview Content */,
+				3868992327AB7A52004126AC /* GameView.swift */,
+				3868992727B496F2004126AC /* GameScene.swift */,
 			);
 			path = GazeCollect;
 			sourceTree = "<group>";
@@ -137,7 +145,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3868991827AB76A3004126AC /* ContentView.swift in Sources */,
+				3868992427AB7A52004126AC /* GameView.swift in Sources */,
+				3868991827AB76A3004126AC /* MenuView.swift in Sources */,
+				3868992827B496F2004126AC /* GameScene.swift in Sources */,
 				3868991627AB76A3004126AC /* GazeCollectApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -272,6 +282,8 @@
 				DEVELOPMENT_TEAM = 9AP4J297H5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GazeCollect/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take video from front camera";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -301,6 +313,8 @@
 				DEVELOPMENT_TEAM = 9AP4J297H5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GazeCollect/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take video from front camera";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

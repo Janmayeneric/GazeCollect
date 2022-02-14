@@ -9,9 +9,10 @@ import SwiftUI
 
 @main
 struct GazeCollectApp: App {
+    @State private var isGameShowing = true
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MenuView()
         }
     }
 }
