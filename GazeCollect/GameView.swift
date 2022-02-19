@@ -12,7 +12,8 @@ import AVFoundation
 struct GameView: View {
     @State private var isPaused = false
     @Binding var isGameShowing: Bool
-    @StateObject var camera = cameraModel()
+    
+    
     var game:  SKScene{
         let scene = GameScene()
         print("screen size: ", UIScreen.main.bounds.size.width, "|||", UIScreen.main.bounds.size.height)
@@ -28,17 +29,40 @@ struct GameView: View {
                 SpriteView(scene: game, isPaused: isPaused)
                     .frame(width: UIScreen.main.bounds.size.width, height: UIScreen.main.bounds.size.height).ignoresSafeArea()
                     .onAppear{
-                        camera.Check()
+                        let fileManager = FileManager.default
+                        /*
+                         find the directory for the app
+                         */
+                        let appPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                        
+                        /*
+                         then create the folder for this session
+                         name is the time before the recording
+                         */
+                        let folderName = String(Int(Date().timeIntervalSince1970*1000))
+                        
+                        let folderUrl = appPath.appendingPathComponent(folderName,isDirectory: true)
+                        
+                        if !fileManager.fileExists(atPath: folderUrl.path){
+                            try! fileManager.createDirectory(at: folderUrl, withIntermediateDirectories: true, attributes: nil)
+                        }
+                        
+                        // start the camera when the session begin
+                        let cameraManager = CameraManager(at: folderUrl)
                         /*
                          in the block of onAppear
                          i use the dispatch queue only allow the scene to appear for set time (project plan is 1 minute)
                          */
+                        cameraManager.start()
                         DispatchQueue.main.asyncAfter(
                             deadline: .now() + 10){
+                                cameraManager.end()
                                 withAnimation(.easeIn){ // some fancy animation, more Apple, you know
                                     isGameShowing.toggle() // trigger the end tag, back to menu
                                 }
                             }
+                        
+                        
                         
                     }
             }
@@ -52,70 +76,151 @@ struct GameView: View {
 /*
  camera model for the video recording
  */
-class cameraModel: ObservableObject{
-    @Published var isTaken = false
-    @Published var session = AVCaptureSession()
-    @Published var alert = false
+class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate{
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+    }
     
-    @Published var output = AVCaptureVideoDataOutput()
     
-    func Check(){
+    /*
+     it is the root directory of the file for this session
+     */
+    var root:URL
+    
+    init(at directory: URL){
+        self.root = directory
+    }
+    
+    
+    let movieOutput = AVCaptureMovieFileOutput()
+    /*
+     the status code
+     */
+    enum Status{
+        case unconfigured
+        case configured
+        case unauthorized
+        case failed
         
-        // check for the permission
+    }
+    
+    /*
+     error handling code
+     */
+    enum CameraError: Error{
+        case denied
+        case restricted
+        case unknown
+        case unavailable
+        case canNotAddInput
+        case cannotAddOutput
+    }
+    
+    @Published var error: CameraError?
+    
+    let captureSession = AVCaptureSession()
+    
+    private let captureSessionQueue = DispatchQueue(label: "video")
+    
+    private var status = Status.unconfigured
+    
+    /*
+     checck for permission
+     configure the capture session
+     and start it
+     */
+     func start(){
+        let videoPath = root.appendingPathComponent("video.mov")
+        checkPermissions()
+        captureSessionQueue.async {
+            self.configureCaptureSession()
+            self.captureSession.startRunning()
+            self.movieOutput.startRecording(to: videoPath, recordingDelegate: self)
+            print("start recording : ", videoPath)
+        }
+    }
+    
+    func end(){
+        captureSessionQueue.async {
+            self.movieOutput.stopRecording()
+            self.captureSession.stopRunning()
+        }
+    }
+    
+    
+    private func set(error: CameraError?){
+        DispatchQueue.main.async {
+            self.error = error
+        }
+    }
+    
+    /*
+     check the permission from the device
+     */
+    private func checkPermissions(){
         switch AVCaptureDevice.authorizationStatus(for: .video){
-        case .authorized:
-            // start the session after the permission
-            setUp()
-            return
         case .notDetermined:
-            // reasking
-            AVCaptureDevice.requestAccess(for: .video){
-                [weak self] granted in guard granted else{
-                    return
-                }
-                DispatchQueue.main.async{
-                    self?.setUp()
-                }
-            }
-        case .denied:
-            self.alert.toggle()
-            return
             
-        default:
-            return
-        }
-    }
-    
-    func setUp(){
-        let session = AVCaptureSession()
-        if let device = AVCaptureDevice.default(for: .video){
-            do{
-                let input = try AVCaptureDeviceInput(device: device)
-                if session.canAddInput(input){
-                    session.addInput(input)
+            captureSessionQueue.suspend()
+            AVCaptureDevice.requestAccess(for: .video){authorized in
+                if !authorized{
+                    self.status = .unauthorized
+                    self.set(error: .denied)
                 }
-                
-                if session.canAddOutput(output){
-                    session.addOutput(output)
-                }
-                
-                session.startRunning()
-                self.session = session
-                
-            }catch{
-                
+                self.captureSessionQueue.resume()
             }
-        }
         
+        case .restricted:
+            status = .unauthorized
+            set(error: .restricted)
+        
+        case .denied:
+            status = .unauthorized
+            set(error: .denied)
+        
+        case .authorized:
+            print("authorized")
+            break
+            
+        @unknown default:
+            status = .unauthorized
+            set(error: . unknown)
+        }
     }
     
-    func startRecording(){
-        DispatchQueue.global(qos:.background).async{
-            self.session.startRunning()
-            
+    
+    private func configureCaptureSession(){
+        guard status == .unconfigured else{
+            return
         }
+        captureSession.beginConfiguration()
+        
+        // get the capture device, need the front camera and for video purpose
+        let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+        
+        // if he request device do not have the front camera, return
+        
+        guard
+            let videoDeviceInput = try? AVCaptureDeviceInput(device: videoDevice!),
+            captureSession.canAddInput(videoDeviceInput)
+            else {
+                status = .unconfigured
+                set(error:.canNotAddInput)
+                return }
+        captureSession.addInput(videoDeviceInput)
+        
+        guard captureSession.canAddOutput(movieOutput) else {
+            status = .unconfigured
+            set(error:.cannotAddOutput)
+            return
+        }
+        captureSession.addOutput(movieOutput)
+        
+        status = .configured
+        
+        captureSession.commitConfiguration()
+        print("configured")
+        return
     }
 }
-
 
 

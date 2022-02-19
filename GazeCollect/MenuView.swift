@@ -15,6 +15,8 @@ struct MenuView: View {
     @State private var isGameShowing = false
     
     var body: some View {
+        ZStack{
+            Color.white.edgesIgnoringSafeArea(.all)
         VStack{
             if !isGameShowing {
                 Text("Gaze Collection")
@@ -28,10 +30,13 @@ struct MenuView: View {
                     .onTapGesture {
                         isGameShowing.toggle()
                     }
+
             }else{
                 GameView(isGameShowing: $isGameShowing)
                     .transition(.scale)
             }
+                
+        }
         }
     }
 }
