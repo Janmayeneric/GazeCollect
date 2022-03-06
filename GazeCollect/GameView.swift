@@ -12,24 +12,30 @@ import AVFoundation
 struct GameView: View {
     @State private var isPaused = false
     @Binding var isGameShowing: Bool
-    
+    @State private var isAnimated = true
+    @State private var success = false
+    @State private var cameraManager: CameraManager!
+    @State private var folderUrl: URL!
+    @State private var fileManager: FileManager!
+    @State private var printString = ""
     
     var game:  SKScene{
-        let scene = GameScene()
-        print("screen size: ", UIScreen.main.bounds.size.width, "|||", UIScreen.main.bounds.size.height)
+        
+        let scene = GameScene(isStart: $isAnimated, isSuccess: $success, write: $printString)
+       
         scene.size = CGSize(width: UIScreen.main.bounds.size.width, height: UIScreen.main.bounds.size.height)
-        scene.scaleMode = .fill
+        //scene.scaleMode = .fill
         return scene
     }
     
     
     var body: some View{
-        if(isGameShowing){
+        if(isAnimated){
             ZStack(alignment: .top){
                 SpriteView(scene: game, isPaused: isPaused)
                     .frame(width: UIScreen.main.bounds.size.width, height: UIScreen.main.bounds.size.height).ignoresSafeArea()
                     .onAppear{
-                        let fileManager = FileManager.default
+                        fileManager = FileManager.default
                         /*
                          find the directory for the app
                          */
@@ -41,14 +47,15 @@ struct GameView: View {
                          */
                         let folderName = String(Int(Date().timeIntervalSince1970*1000))
                         
-                        let folderUrl = appPath.appendingPathComponent(folderName,isDirectory: true)
+                        folderUrl = appPath.appendingPathComponent(folderName,isDirectory: true)
                         
                         if !fileManager.fileExists(atPath: folderUrl.path){
                             try! fileManager.createDirectory(at: folderUrl, withIntermediateDirectories: true, attributes: nil)
                         }
                         
+                        
                         // start the camera when the session begin
-                        let cameraManager = CameraManager(at: folderUrl)
+                        cameraManager = CameraManager(at: folderUrl)
                         /*
                          in the block of onAppear
                          i use the dispatch queue only allow the scene to appear for set time (project plan is 1 minute)
@@ -57,17 +64,37 @@ struct GameView: View {
                         DispatchQueue.main.asyncAfter(
                             deadline: .now() + 10){
                                 cameraManager.end()
-                                withAnimation(.easeIn){ // some fancy animation, more Apple, you know
-                                    isGameShowing.toggle() // trigger the end tag, back to menu
-                                }
                             }
-                        
-                        
-                        
                     }
             }
         }else{
-            MenuView()
+            if success {
+                MenuView().onAppear{
+                    let textpath = folderUrl.appendingPathComponent("output.txt")
+                    
+                    do{
+                        try printString.write(to: textpath,atomically: true, encoding: String.Encoding.utf8)
+                    }catch{
+                        
+                    }
+                    isGameShowing.toggle()
+                }
+            }else{
+                VStack{
+                    Text("Please try again")
+                        .font(.largeTitle)
+                        .foregroundColor(.black)
+                        .padding()
+                    Spacer()
+                    Button("back to menu",action: {isGameShowing.toggle()}).padding()
+                    
+                }.onAppear{
+                    cameraManager.end()
+                    if fileManager.fileExists(atPath: folderUrl.path){
+                        try! fileManager.removeItem(at: folderUrl)
+                    }
+                }
+            }
         }
     }
 }

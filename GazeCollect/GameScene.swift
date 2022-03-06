@@ -6,26 +6,38 @@
 //
 
 import SpriteKit
+import SwiftUI
 
 class GameScene: SKScene{
+    
+    /*
+     an approach to control the process of the animation
+     the animation will stop if user press the wrong side of the screem
+     */
+    @Binding var continueAnimation: Bool
+    @Binding var success: Bool
+    @Binding var printString: String
     /*
      the array to record the movement of the cycles
      it is public for output to the text file
      */
     @Published var times: [Double] = []
     @Published var locations: [CGPoint] = []
+    @Published var folderURL: URL!
     
     /*
      it is the starting time of the new session
      */
     @Published private var sessions: [CFTimeInterval] = []
     
+    
     /*
-     this is the x coordinate of the touching
-     and time intervals of touching
+     two variables to monitor the user's actions
+     one is to make sure user point the the left side of the screen
+     one is to make sure user touch the screen in the on second
      */
-    @Published private var touchesLocations_x: [CGFloat] = []
-    @Published private var touchesTime: [CFTimeInterval] = []
+    @Published private var isLeft: Bool = true
+    @Published private var touched: Bool = true
     
     @Published private var areLeftFlags: [Bool] = []
     /*
@@ -35,6 +47,23 @@ class GameScene: SKScene{
      */
     @Published var goodSession:Bool = true
     
+    
+    /*
+     this is a constructor 
+     */
+    init(isStart isstart: Binding<Bool>, isSuccess success: Binding<Bool>, write printString: Binding<String>){
+        _continueAnimation = isstart
+        _success = success
+        _printString =  printString
+        super.init(
+            size: CGSize(
+                width: UIScreen.main.bounds.size.width,
+                height: UIScreen.main.bounds.size.height))
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
     /*
      after view controller is called
      randomly generate a point on the screen
@@ -44,10 +73,13 @@ class GameScene: SKScene{
         let animationTime = 10// in second, left is duration time
         let points = generatePoints(for: animationTime + 1)
         areLeftFlags = generateAreLeft(for: animationTime + 1)
+        
         var actions : [SKAction] = []
         var isRed = true
         for i in 0...animationTime - 1{
             actions.append(SKAction.run({self.moveCycle(from: points[i], to: points[i+1],isLeft: self.areLeftFlags[i],isRed: isRed)}))
+            
+            // different colour to remind the user for next round
             actions.append(SKAction.run {
                 isRed.toggle()
             })
@@ -64,7 +96,8 @@ class GameScene: SKScene{
             self.sessions.append(CACurrentMediaTime())
         }
         actions.append(finalCycle)
-        actions.append(checkTouches)
+        actions.append(SKAction.run {self.success = true})
+        actions.append(SKAction.run({self.continueAnimation = false}))
         run(SKAction.sequence(actions))
         
     }
@@ -73,11 +106,10 @@ class GameScene: SKScene{
         /*
          record the time and the position of the cycle in each frame
          */
-        times.append(currentTime)
-        //print("Time: ",currentTime)
         if let cycle = self.childNode(withName: "cycle"){
             locations.append(cycle.position)
-            //print("Position: ", cycle.position)
+            times.append(currentTime)
+            printString += String(cycle.position) + ","+String(currentTime) + "\n"
         }
     }
     
@@ -89,10 +121,20 @@ class GameScene: SKScene{
      so only take account in the x coordinate
      */
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?){
-        for touch in touches{
-            let location_x = touch.location(in: self).x
-            touchesLocations_x.append(location_x)
-            touchesTime.append(CACurrentMediaTime())
+        var isTouchLeft = false
+        guard let touch = touches.first else {return}
+        self.touched = true
+        let location_x = touch.location(in: self).x
+        if location_x < UIScreen.main.bounds.size.width/2 {
+            isTouchLeft = true
+        }else{
+            isTouchLeft = false
+        }
+        
+        if isTouchLeft != self.isLeft {
+            continueAnimation.toggle()
+            success = false
+            print("wrong direction!!!!!")
         }
     }
     
@@ -103,6 +145,21 @@ class GameScene: SKScene{
         // start of the new session
         self.sessions.append(CACurrentMediaTime())
         var cycle: Cycle // create a cycle
+        
+        
+        if !self.touched {
+            print("too long")
+            self.continueAnimation.toggle()
+            self.success = false
+        }
+        /*
+         before the movement of the cycle
+         change the direction guide for this intervals
+         and then change the touch state to default = false
+         */
+        self.isLeft = left
+        self.touched = false
+        
         let r = 1/2 * 1/10 * self.size.width // customized radius based on the screen size
         cycle = Cycle()
         cycle.configure(at: start, radius: r, left: left, red: isred)
@@ -160,74 +217,7 @@ class GameScene: SKScene{
         locations.append(position)
     }
     
-    /*
-     every second count as one session(e.g. 60s animation have 60 sessions)
-     for every sessino, user need at least one correct action
-     touch the right side of the screen
-     two senario lead to failure:
-        1, user touch the wrong side in this session
-        2, user did not touch any time in this sessino
-     */
-    func checkTouches() -> Bool{
-        // every session need one check
-        var session_checked = true
-        
-        // this is the index for the touches
-        var checked_touches = 0
-        
-        /*
-         i need to check the touches among the session
-         the logic of this for loop switching is depend on the inner while loop
-         the while loop check every touches among the sessions
-         it check the next sessions when
-            the touches time is in the next session
-            there are no further touches
-         */
-        for i in 0...sessions.count-2{
-            // it mean there is no touch in last session return false
-            if !session_checked{
-                return false
-            }
-            session_checked = false
-            
-            /*
-             now check the touch
-             to make sure the user are touching the which side of the screen
-             use the x coordinate of the touching compare to the screen width to validate
-             */
-            while(checked_touches < touchesTime.count){
-                
-                // check if the touch is still in the session
-                if touchesTime[checked_touches] < sessions[i + 1] {
-                    
-                    // check where user touches
-                    var touchLeft: Bool
-                    if touchesLocations_x[checked_touches] > 1/2 * self.size.width{
-                        touchLeft = true
-                    }else{
-                        touchLeft = false
-                    }
-                    
-                    /*
-                     check the user actual action and the supposed actions
-                     */
-                    if areLeftFlags[i] == touchLeft{
-                        session_checked = true
-                        checked_touches += 1
-                    }else{
-                        return false
-                    }
-                    
-                }else{
-                    break
-                }
-            }
-        }
-        if session_checked {
-            return true
-        }
-        return false
-    }
+    
     
 }
 
