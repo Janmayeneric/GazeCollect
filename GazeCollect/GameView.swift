@@ -10,6 +10,7 @@ import SpriteKit
 import AVFoundation
 
 struct GameView: View {
+    let TITLE = "Time,X,Y,\"X accleration\", \"Y accleration \"\r"
     @State private var isPaused = false
     @Binding var isGameShowing: Bool
     @State private var isAnimated = true
@@ -18,10 +19,13 @@ struct GameView: View {
     @State private var folderUrl: URL!
     @State private var fileManager: FileManager!
     @State private var printString = ""
+    @State var time: Int
+    @State var length: Double
+    @State var size: Double
     
     var game:  SKScene{
         
-        let scene = GameScene(isStart: $isAnimated, isSuccess: $success, write: $printString)
+        let scene = GameScene(isStart: $isAnimated, isSuccess: $success, write: $printString, for: time, chooseSize: size, chooselength: length)
        
         scene.size = CGSize(width: UIScreen.main.bounds.size.width, height: UIScreen.main.bounds.size.height)
         //scene.scaleMode = .fill
@@ -35,6 +39,7 @@ struct GameView: View {
                 SpriteView(scene: game, isPaused: isPaused)
                     .frame(width: UIScreen.main.bounds.size.width, height: UIScreen.main.bounds.size.height).ignoresSafeArea()
                     .onAppear{
+                        printString = TITLE
                         fileManager = FileManager.default
                         /*
                          find the directory for the app
@@ -62,7 +67,7 @@ struct GameView: View {
                          */
                         cameraManager.start()
                         DispatchQueue.main.asyncAfter(
-                            deadline: .now() + 10){
+                            deadline: .now() + Double(time)){
                                 cameraManager.end()
                             }
                     }
@@ -70,7 +75,7 @@ struct GameView: View {
         }else{
             if success {
                 MenuView().onAppear{
-                    let textpath = folderUrl.appendingPathComponent("output.txt")
+                    let textpath = folderUrl.appendingPathComponent("output.csv")
                     
                     do{
                         try printString.write(to: textpath,atomically: true, encoding: String.Encoding.utf8)

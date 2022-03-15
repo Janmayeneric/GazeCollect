@@ -7,9 +7,9 @@
 
 import SpriteKit
 import SwiftUI
+import CoreMotion
 
 class GameScene: SKScene{
-    
     /*
      an approach to control the process of the animation
      the animation will stop if user press the wrong side of the screem
@@ -17,6 +17,7 @@ class GameScene: SKScene{
     @Binding var continueAnimation: Bool
     @Binding var success: Bool
     @Binding var printString: String
+    
     /*
      the array to record the movement of the cycles
      it is public for output to the text file
@@ -24,13 +25,19 @@ class GameScene: SKScene{
     @Published var times: [Double] = []
     @Published var locations: [CGPoint] = []
     @Published var folderURL: URL!
-    
+    @Published var accleration_x: CGFloat = 0
+    @Published var accleration_y: CGFloat = 0
+    @Published var r: Double!
     /*
      it is the starting time of the new session
      */
     @Published private var sessions: [CFTimeInterval] = []
     
+    @Published var chooseSize:Double
+    @Published var chooseLength:Double
+    @Published var time: Int
     
+    let motion = CMMotionManager()
     /*
      two variables to monitor the user's actions
      one is to make sure user point the the left side of the screen
@@ -49,12 +56,15 @@ class GameScene: SKScene{
     
     
     /*
-     this is a constructor 
+     this is a constructor for this scene
      */
-    init(isStart isstart: Binding<Bool>, isSuccess success: Binding<Bool>, write printString: Binding<String>){
+    init(isStart isstart: Binding<Bool>, isSuccess success: Binding<Bool>, write printString: Binding<String>, for duration: Int, chooseSize choosesize: Double, chooselength: Double){
         _continueAnimation = isstart
         _success = success
         _printString =  printString
+        time = duration
+        chooseSize = choosesize
+        chooseLength = chooselength
         super.init(
             size: CGSize(
                 width: UIScreen.main.bounds.size.width,
@@ -69,14 +79,17 @@ class GameScene: SKScene{
      randomly generate a point on the screen
      */
     override func didMove(to view: SKView) {
-        
-        let animationTime = 10// in second, left is duration time
-        let points = generatePoints(for: animationTime + 1)
-        areLeftFlags = generateAreLeft(for: animationTime + 1)
+        self.r = 1/2 * 1/10  * self.size.width * self.chooseSize
+        // generate the points position
+        let points = generatePoints(for: time + 1,length: self.chooseLength)
+        // generate the arrows
+        areLeftFlags = generateAreLeft(for: time + 1)
         
         var actions : [SKAction] = []
+        
         var isRed = true
-        for i in 0...animationTime - 1{
+        
+        for i in 0...time - 1{
             actions.append(SKAction.run({self.moveCycle(from: points[i], to: points[i+1],isLeft: self.areLeftFlags[i],isRed: isRed)}))
             
             // different colour to remind the user for next round
@@ -88,9 +101,9 @@ class GameScene: SKScene{
         
         let finalCycle = SKAction.run {
             var cycle: Cycle // create a cycle
-            let r = 1/2 * 1/10 * self.size.width // customized radius based on the screen size
+            let r = 1/2 * 1/10  * self.size.width // customized radius based on the screen size
             cycle = Cycle()
-            cycle.configure(at: points[animationTime], radius: r, left: true,red: isRed)
+            cycle.configure(at: points[self.time], radius: r, left: true,red: isRed, size: self.chooseSize)
             cycle.name = "cycle"
             self.addChild(cycle)
             self.sessions.append(CACurrentMediaTime())
@@ -98,10 +111,27 @@ class GameScene: SKScene{
         actions.append(finalCycle)
         actions.append(SKAction.run {self.success = true})
         actions.append(SKAction.run({self.continueAnimation = false}))
+        actions.append(SKAction.run({self.turnOffAccelerometer()}))
         run(SKAction.sequence(actions))
         
     }
     
+    /*
+     similar function to the scene did load
+     to initiate the acclerator to record the orientation
+     */
+    override func sceneDidLoad() {
+        super.sceneDidLoad()
+        
+        if self.motion.isAccelerometerAvailable{
+            self.motion.accelerometerUpdateInterval = 1.0/60.0
+            self.motion.startAccelerometerUpdates()
+        }
+    }
+    
+    /*
+     it is the update function, update 1 time perf rame in 60 HZ
+     */
     override func update(_ currentTime: TimeInterval) {
         /*
          record the time and the position of the cycle in each frame
@@ -109,11 +139,29 @@ class GameScene: SKScene{
         if let cycle = self.childNode(withName: "cycle"){
             locations.append(cycle.position)
             times.append(currentTime)
-            printString += String(cycle.position) + ","+String(currentTime) + "\n"
+            printString += String(currentTime)
+            printString += ","
+            printString += cycle.position.x.description
+            printString += ","
+            printString += cycle.position.y.description
+            
+            // accelerometerdata is optional in default setting
+            if let data = self.motion.accelerometerData{
+                printString += ","
+                printString += String(data.acceleration.x)
+                printString += ","
+                printString += String(data.acceleration.y)
+            }else{
+                // or just not print them in csv file
+                printString += ",,"
+            }
+            
+            printString += "\r"
+            
+            
         }
     }
-    
-    
+
     
     /*
      when the touches begin, reocord the time and the location of the touches
@@ -160,9 +208,8 @@ class GameScene: SKScene{
         self.isLeft = left
         self.touched = false
         
-        let r = 1/2 * 1/10 * self.size.width // customized radius based on the screen size
         cycle = Cycle()
-        cycle.configure(at: start, radius: r, left: left, red: isred)
+        cycle.configure(at: start, radius: self.r, left: left, red: isred, size: self.chooseSize)
         cycle.name = "cycle"
         addChild(cycle)
         
@@ -181,17 +228,53 @@ class GameScene: SKScene{
     /*
      create numbers of points before the animation
      it decide the path of the point
-     can adjust the duration(second) in parameter
+     can adjust the duration(second) and path length in parameter
+
      */
-    func generatePoints(for duration: Int) -> [CGPoint]{
-        let r = 1/2 * 1/10 * self.size.width
+    func generatePoints(for duration: Int, length l:Double ) -> [CGPoint]{
+        let length = l * (self.size.width-2*self.r)
         var points : [CGPoint] = []
-        for _ in 1...duration {
-            let random_x = CGFloat.random(in: r...self.size.width-r)
-            let random_y = CGFloat.random(in: r...self.size.height-r)
-            points.append(CGPoint(x: random_x, y:random_y))
+        
+        // add a point first
+        points.append(
+            CGPoint(x: CGFloat.random(in: self.r...self.size.width - self.r),
+                    y: CGFloat.random(in: self.r...self.size.height - self.r)
+                   )
+        )
+        
+        // then move the cycle in a fixed length, but with the different angle
+        for _ in 1...duration - 1 {
+            if let point = points.last{
+                points.append(self.findPoint(length: length, Point: point))
+            }
         }
         return points
+    }
+    
+    /*
+     find the correct degree for the movement
+     the wrong degree means the length may go out of the screen
+     */
+    func findPoint(length l:Double, Point p: CGPoint) -> CGPoint{
+        print("find the point")
+        // it is a infinite loop, to let the check complete
+        while true{
+            let degree = Double.random(in: 0...360)
+            let change_x = l * cos(degree * Double.pi / 180)
+            let change_y = l * -sin(degree * Double.pi / 180)
+            let new_x = p.x + change_x
+            let new_y = p.y + change_y
+            
+            // check if the new x and y position is in the bound of the screen
+            
+            if new_x < self.r || new_x > self.size.width - self.r{
+                continue
+            }
+            if new_y < self.r || new_y > self.size.height - self.r{
+                continue
+            }
+            return CGPoint(x: new_x, y: new_y)
+        }
     }
     
     
@@ -209,6 +292,13 @@ class GameScene: SKScene{
         return AreLeft
     }
     
+    // need to turn off the accelerometer after the caputre
+    func turnOffAccelerometer(){
+        if self.motion.isAccelerometerActive{
+            self.motion.stopAccelerometerUpdates()
+        }
+    }
+    
     /*
      it is recrod the position of the cycle with the time, for the timestamp for the video
      */
@@ -218,17 +308,22 @@ class GameScene: SKScene{
     }
     
     
-    
 }
 
 class Cycle: SKNode{
     var isHit = false
     
-    func configure(at position: CGPoint, radius r:CGFloat, left isLeft:Bool, red isRed:Bool){
+    
+    func configure(at position: CGPoint, radius r:CGFloat, left isLeft:Bool, red isRed:Bool, size real_size:Double){
         self.position = position
         self.zPosition = 1
-        let cycle = SKShapeNode(circleOfRadius:  r)
+        let cycle = SKShapeNode(circleOfRadius: r)
         cycle.zPosition = 2
+        
+        /*
+         switch the color for two intervals
+         easy for user to know when to tape the cycle
+         */
         if isRed{
             cycle.strokeColor = UIColor.red
             cycle.fillColor = UIColor.red
@@ -236,17 +331,21 @@ class Cycle: SKNode{
             cycle.strokeColor = UIColor.blue
             cycle.fillColor = UIColor.blue
         }
-        
         addChild(cycle)
-        let pointer = SKLabelNode()
-        pointer.zPosition = 3
-        pointer.verticalAlignmentMode = .center
+        
+        /*
+         it is the arrow for user to know where to touch the screen
+         */
+        let arrow = SKLabelNode()
+        arrow.zPosition = 3
+        arrow.verticalAlignmentMode = .center
         if(isLeft){
-            pointer.text = "◀︎"
+            arrow.text = "◀︎"
         }else{
-            pointer.text = "▶︎"
+            arrow.text = "▶︎"
         }
-        addChild(pointer)
+        arrow.fontSize = arrow.fontSize * real_size
+        addChild(arrow)
     }
     
     
