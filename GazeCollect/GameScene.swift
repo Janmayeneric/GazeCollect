@@ -2,7 +2,7 @@
 //  GameScene.swift
 //  GazeCollect
 //
-//  Created by 胡欣宇 on 10/02/2022.
+//  Created by eric on 10/02/2022.
 //
 
 import SpriteKit

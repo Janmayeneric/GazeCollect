@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  GazeCollect
 //
-//  Created by 胡欣宇 on 03/02/2022.
+//  Created by eric on 03/02/2022.
 //
 
 import SwiftUI
